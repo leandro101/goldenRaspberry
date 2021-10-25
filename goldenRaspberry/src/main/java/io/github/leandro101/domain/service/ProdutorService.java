@@ -1,10 +1,10 @@
 package io.github.leandro101.domain.service;
 
+import io.github.leandro101.domain.exception.ProdutoresNotFound;
 import io.github.leandro101.domain.model.Filme;
 import io.github.leandro101.domain.model.Produtor;
 import io.github.leandro101.domain.model.ProdutorIntervalo;
 import io.github.leandro101.domain.model.enumeration.TipoIntervalo;
-import io.github.leandro101.domain.exception.ProdutoresNotFound;
 import io.github.leandro101.domain.repository.FilmeDAO;
 import io.github.leandro101.domain.repository.ProdutorDAO;
 import io.github.leandro101.rest.dto.IntervaloMinimoDTO;
@@ -30,8 +30,8 @@ public class ProdutorService {
         List<Produtor> produtores = produtorDAO.findAll();
         this.validaListaProdutoresBanco(produtores);
         for(Produtor produtor : produtores) {
-            ProdutorIntervalo intervaloProd = this.getIntervaloByProdutor(produtor, tipoIntervalo);
-            if (intervaloProd.getInterval() == null)
+            List<ProdutorIntervalo> intervaloProd = this.getIntervaloByProdutor(produtor, tipoIntervalo);
+            if (intervaloProd.isEmpty())
                 continue;
             if(tipoIntervalo == TipoIntervalo.MENOR)
                 listaRecord = this.atualizaListaRecordMenorInt(listaRecord, intervaloProd);
@@ -47,62 +47,87 @@ public class ProdutorService {
     }
 
     private List<ProdutorIntervalo>  atualizaListaRecordMenorInt (List<ProdutorIntervalo> listaRecord,
-                                                                  ProdutorIntervalo intervaloProd){
-        if (listaRecord.isEmpty() || listaRecord.get(0).equals(intervaloProd)) {
-            listaRecord.add(intervaloProd);
-        } else if (listaRecord.get(0).getInterval() > intervaloProd.getInterval()) {
+                                                                  List<ProdutorIntervalo> intervaloProd){
+        if (listaRecord.isEmpty() || listaRecord.get(0).equals(intervaloProd.get(0))) {
+            listaRecord.addAll(intervaloProd);
+        } else if (listaRecord.get(0).getInterval() > intervaloProd.get(0).getInterval()) {
             listaRecord.clear();
-            listaRecord.add(intervaloProd);
+            listaRecord.addAll(intervaloProd);
         }
         return listaRecord;
     }
 
     private List<ProdutorIntervalo> atualizaListaRecordMaiorInt(List<ProdutorIntervalo> listaRecord,
-                                                                ProdutorIntervalo intervaloProd){
+                                                                List<ProdutorIntervalo> intervaloProd){
         if (listaRecord.isEmpty() || listaRecord.get(0).equals(intervaloProd)) {
-            listaRecord.add(intervaloProd);
-        } else if (listaRecord.get(0).getInterval() < intervaloProd.getInterval()) {
+            listaRecord.addAll(intervaloProd);
+        } else if (listaRecord.get(0).getInterval() < intervaloProd.get(0).getInterval()) {
             listaRecord.clear();
-            listaRecord.add(intervaloProd);
+            listaRecord.addAll(intervaloProd);
         }
         return listaRecord;
     }
 
-    private ProdutorIntervalo getIntervaloByProdutor(Produtor produtor, TipoIntervalo tipoIntervalo){
+    private List<ProdutorIntervalo> getIntervaloByProdutor(Produtor produtor, TipoIntervalo tipoIntervalo){
         ProdutorIntervalo prodIntervalo = new ProdutorIntervalo();
         prodIntervalo.setProducer(produtor.getNome());
+        List<ProdutorIntervalo> listaProdutor = new ArrayList<>();
         List<Filme> filmes = filmeDAO.findFilmeByVencedorAndProdutoresOrderByAno("yes", produtor);
         if(filmes.size() > 1) {
             filmes.forEach(filme -> {
+                if(produtor.getNome().equals("Joel Silver"))
+                    System.out.println("aqui");
                 if(prodIntervalo.getPreviousWin() == null) {
                     prodIntervalo.setPreviousWin(filme.getAno());
                 } else if(prodIntervalo.getFollowingWin() == null) {
                     prodIntervalo.setFollowingWin(filme.getAno());
                     prodIntervalo.setInterval(prodIntervalo.getFollowingWin() - prodIntervalo.getPreviousWin());
+                    listaProdutor.add(prodIntervalo);
                 }else {
                     if(tipoIntervalo == TipoIntervalo.MENOR)
-                        this.atualizaRecordProdutorMenorInt(filme, prodIntervalo);
+                        this.atualizaRecordProdutorMenorInt(filme, prodIntervalo, listaProdutor);
                     else
-                        this.atualizaRecordProdutorMaiorInt(filme, prodIntervalo);
+                        this.atualizaRecordProdutorMaiorInt(filme, prodIntervalo, listaProdutor);
                 }
             });
         }
-        return prodIntervalo;
+        return listaProdutor;
     }
 
-    private void atualizaRecordProdutorMenorInt(Filme filme, ProdutorIntervalo produtorIntervalo){
-        if ((filme.getAno() - produtorIntervalo.getFollowingWin()) < produtorIntervalo.getInterval()) {
+    private void atualizaRecordProdutorMenorInt(Filme filme, ProdutorIntervalo produtorIntervalo,
+                                                List<ProdutorIntervalo> listaRecords){
+        if ((filme.getAno() - produtorIntervalo.getFollowingWin()) == produtorIntervalo.getInterval()) {
+            updateRecord(filme, produtorIntervalo, listaRecords);
+        }else if ((filme.getAno() - produtorIntervalo.getFollowingWin()) < produtorIntervalo.getInterval()) {
+            listaRecords.clear();
             produtorIntervalo.setPreviousWin(produtorIntervalo.getFollowingWin());
             produtorIntervalo.setFollowingWin(filme.getAno());
             produtorIntervalo.setInterval(produtorIntervalo.getFollowingWin() - produtorIntervalo.getPreviousWin());
+            listaRecords.add(produtorIntervalo);
         }
     }
 
-    private void atualizaRecordProdutorMaiorInt(Filme filme, ProdutorIntervalo produtorIntervalo){
-        if ((filme.getAno() - produtorIntervalo.getFollowingWin()) > produtorIntervalo.getInterval()) {
+    private void updateRecord(Filme filme, ProdutorIntervalo produtorIntervalo, List<ProdutorIntervalo> listaRecords) {
+        ProdutorIntervalo novoInt = new ProdutorIntervalo(produtorIntervalo.getProducer(),
+                filme.getAno() - produtorIntervalo.getFollowingWin(), produtorIntervalo.getFollowingWin(),
+                filme.getAno());
+        listaRecords.add(novoInt);
+        produtorIntervalo.setProducer(novoInt.getProducer());
+        produtorIntervalo.setInterval(novoInt.getInterval());
+        produtorIntervalo.setPreviousWin(novoInt.getPreviousWin());
+        produtorIntervalo.setFollowingWin(novoInt.getFollowingWin());
+    }
+
+    private void atualizaRecordProdutorMaiorInt(Filme filme, ProdutorIntervalo produtorIntervalo,
+                                                List<ProdutorIntervalo> listaRecords){
+        if ((filme.getAno() - produtorIntervalo.getFollowingWin()) == produtorIntervalo.getInterval()) {
+            updateRecord(filme, produtorIntervalo, listaRecords);
+        } else if ((filme.getAno() - produtorIntervalo.getFollowingWin()) > produtorIntervalo.getInterval()) {
+            listaRecords.clear();
             produtorIntervalo.setPreviousWin(produtorIntervalo.getFollowingWin());
             produtorIntervalo.setFollowingWin(filme.getAno());
             produtorIntervalo.setInterval(produtorIntervalo.getFollowingWin() - produtorIntervalo.getPreviousWin());
+            listaRecords.add(produtorIntervalo);
         }
     }
 
