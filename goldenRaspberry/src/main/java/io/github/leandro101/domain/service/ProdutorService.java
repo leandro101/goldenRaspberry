@@ -75,8 +75,6 @@ public class ProdutorService {
         List<Filme> filmes = filmeDAO.findFilmeByVencedorAndProdutoresOrderByAno("yes", produtor);
         if(filmes.size() > 1) {
             filmes.forEach(filme -> {
-                if(produtor.getNome().equals("Joel Silver"))
-                    System.out.println("aqui");
                 if(prodIntervalo.getPreviousWin() == null) {
                     prodIntervalo.setPreviousWin(filme.getAno());
                 } else if(prodIntervalo.getFollowingWin() == null) {
