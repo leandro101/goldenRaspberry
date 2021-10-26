@@ -59,7 +59,7 @@ public class ProdutorService {
 
     private List<ProdutorIntervalo> atualizaListaRecordMaiorInt(List<ProdutorIntervalo> listaRecord,
                                                                 List<ProdutorIntervalo> intervaloProd){
-        if (listaRecord.isEmpty() || listaRecord.get(0).equals(intervaloProd)) {
+        if (listaRecord.isEmpty() || listaRecord.get(0).equals(intervaloProd.get(0))) {
             listaRecord.addAll(intervaloProd);
         } else if (listaRecord.get(0).getInterval() < intervaloProd.get(0).getInterval()) {
             listaRecord.clear();
